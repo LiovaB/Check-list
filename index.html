@@ -152,7 +152,6 @@
     user-select: none;
   }
 
-  /* Прячем нативный чекбокс, но оставляем доступным с клавиатуры */
   .item input[type="checkbox"]{
     position: absolute;
     width: 1px;
@@ -283,32 +282,6 @@
     .items{ padding: 8px 8px; }
     .item label{ padding: 12px; }
   }
-
-  /* ---------- Печать / сохранение в PDF ---------- */
-  @media print{
-    @page{ margin: 14mm; }
-    body{
-      background: var(--white);
-      padding: 0;
-    }
-    .checklist{
-      max-width: 100%;
-      box-shadow: none;
-      border-radius: 0;
-    }
-    .checklist__header{
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    .actions, .hint{ display: none !important; }
-    .item:hover{ background: transparent; }
-    .item.is-done{ background: transparent; }
-    .item{ break-inside: avoid; }
-    .checkbox{
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-  }
 </style>
 </head>
 
@@ -316,7 +289,6 @@
 
 <main class="checklist" role="main">
 
-  <!-- ШАПКА -->
   <header class="checklist__header">
     <h1 class="checklist__title">Чек-лист проверки курьера</h1>
     <p class="checklist__subtitle">Отметьте каждый пункт после проверки — допуск к работе возможен только при полном выполнении.</p>
@@ -329,7 +301,6 @@
     </div>
   </header>
 
-  <!-- ДАННЫЕ ПРОВЕРКИ -->
   <section class="meta">
     <div class="field">
       <label class="field__label" for="courierName">ФИО курьера</label>
@@ -341,7 +312,6 @@
     </div>
   </section>
 
-  <!-- ПУНКТЫ -->
   <ul class="items" id="itemsList">
 
     <li class="item">
@@ -412,19 +382,17 @@
 
   </ul>
 
-  <!-- ИТОГ -->
   <div class="result" id="result" role="status" aria-live="polite">
     <span>✓</span>
     <span>Все пункты проверены — курьера можно допускать к работе.</span>
   </div>
 
-  <!-- КНОПКИ -->
   <div class="actions">
-    <button type="button" class="btn btn--primary" id="printBtn">Сохранить в PDF / Печать</button>
+    <button type="button" class="btn btn--primary" id="downloadBtn">Скачать результат (.doc)</button>
     <button type="button" class="btn btn--ghost" id="resetBtn">Сбросить отметки</button>
   </div>
 
-  <p class="hint">Отметки сохраняются автоматически в этом браузере. Чек-лист работает без интернета.</p>
+  <p class="hint">После заполнения нажмите «Скачать результат (.doc)» — файл с отметками, ФИО, датой и итогом сохранится на устройстве. Отметки также сохраняются автоматически в этом браузере.</p>
 
 </main>
 
@@ -442,7 +410,7 @@
   var courierInput = document.getElementById('courierName');
   var dateInput    = document.getElementById('checkDate');
   var resetBtn     = document.getElementById('resetBtn');
-  var printBtn     = document.getElementById('printBtn');
+  var downloadBtn  = document.getElementById('downloadBtn');
 
   var state = loadState();
 
@@ -505,6 +473,13 @@
     return d.getFullYear() + '-' + m + '-' + day;
   }
 
+  function formatDateRu(iso) {
+    if (!iso) return '—';
+    var parts = iso.split('-');
+    if (parts.length !== 3) return iso;
+    return parts[2] + '.' + parts[1] + '.' + parts[0];
+  }
+
   /* ---------- Отрисовка состояния ---------- */
   function render() {
     var total = checkboxes.length;
@@ -524,6 +499,95 @@
        if (allDone && window.parent && window.parent.API) { ... } */
   }
 
+  /* ---------- Вспомогательные ---------- */
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+
+  function safeFileName(s) {
+    return String(s || '')
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .replace(/\s+/g, '_')
+      .slice(0, 40) || 'без_имени';
+  }
+
+  /* ---------- Скачивание результата в .doc ---------- */
+  function downloadDoc() {
+    var name = courierInput.value.trim();
+    var date = dateInput.value || todayISO();
+
+    var total = checkboxes.length;
+    var done  = checkboxes.filter(function (cb) { return cb.checked; }).length;
+    var allDone = done === total;
+
+    if (!allDone) {
+      var ok = window.confirm(
+        'Отмечено ' + done + ' из ' + total + ' пунктов.\n' +
+        'Файл будет сохранён с текущими отметками. Продолжить?'
+      );
+      if (!ok) return;
+    }
+
+    var rows = checkboxes.map(function (cb) {
+      var item  = cb.closest('.item');
+      var title = item.querySelector('.item__title').textContent;
+      var desc  = item.querySelector('.item__desc').textContent;
+      var mark  = cb.checked ? '☑' : '☐';
+      var color = cb.checked ? '#2B95CA' : '#2D2D2C';
+      return (
+        '<tr>' +
+          '<td style="padding:8px 10px;border:1px solid #BFD7E4;text-align:center;' +
+              'font-size:18px;line-height:1;color:' + color + ';">' + mark + '</td>' +
+          '<td style="padding:8px 10px;border:1px solid #BFD7E4;">' +
+            '<b>' + escapeHtml(title) + '</b><br>' +
+            '<span style="font-size:12px;color:#555;">' + escapeHtml(desc) + '</span>' +
+          '</td>' +
+        '</tr>'
+      );
+    }).join('');
+
+    var verdict = allDone ? 'ДОПУСК РАЗРЕШЁН' : 'ТРЕБУЕТСЯ ДОРАБОТКА';
+    var verdictColor = allDone ? '#2B95CA' : '#B23A2E';
+
+    var html =
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+            'xmlns:w="urn:schemas-microsoft-com:office:word" ' +
+            'xmlns="http://www.w3.org/TR/REC-html40">' +
+      '<head>' +
+        '<meta charset="utf-8">' +
+        '<title>Чек-лист проверки курьера</title>' +
+        '<style>@page{size:A4;margin:18mm;} body{font-family:Arial,Helvetica,sans-serif;color:#2D2D2C;font-size:14px;}</style>' +
+      '</head>' +
+      '<body>' +
+        '<h1 style="color:#2B95CA;margin:0 0 16px;font-size:22px;">Чек-лист проверки курьера</h1>' +
+        '<table style="border-collapse:collapse;margin-bottom:16px;">' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#555;">ФИО курьера:</td>' +
+              '<td style="padding:4px 0;"><b>' + escapeHtml(name || '—') + '</b></td></tr>' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#555;">Дата проверки:</td>' +
+              '<td style="padding:4px 0;"><b>' + escapeHtml(formatDateRu(date)) + '</b></td></tr>' +
+          '<tr><td style="padding:4px 12px 4px 0;color:#555;">Результат:</td>' +
+              '<td style="padding:4px 0;"><b style="color:' + verdictColor + ';">' +
+              escapeHtml(done + ' из ' + total + ' — ' + verdict) + '</b></td></tr>' +
+        '</table>' +
+        '<table style="border-collapse:collapse;width:100%;">' + rows + '</table>' +
+        '<p style="margin-top:24px;font-size:11px;color:#777;">' +
+          'Документ сформирован автоматически ' + escapeHtml(new Date().toLocaleString('ru-RU')) + '.' +
+        '</p>' +
+      '</body></html>';
+
+    var blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' });
+    var url  = URL.createObjectURL(blob);
+    var a    = document.createElement('a');
+    a.href = url;
+    a.download = 'чек-лист_' + safeFileName(name) + '_' + date + '.doc';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
   /* ---------- Кнопки ---------- */
   resetBtn.addEventListener('click', function () {
     if (!window.confirm('Сбросить все отметки? Данные в полях останутся.')) return;
@@ -534,9 +598,7 @@
     render();
   });
 
-  printBtn.addEventListener('click', function () {
-    window.print();
-  });
+  downloadBtn.addEventListener('click', downloadDoc);
 
   init();
 })();
