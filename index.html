@@ -3,17 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Чек-лист проверки курьера</title>
-
-<!-- Если в курсе есть файл шрифта YS Text — раскомментируйте и подставьте путь.
-     Если нет, сработает системный стек ниже (SF Pro / Segoe UI / Roboto — визуально близки).
-@font-face {
-  font-family: 'YS Text';
-  src: url('fonts/YS-Text-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-}
--->
+<title>Чек-лист проверки перед выдачей байка</title>
 
 <style>
   :root{
@@ -27,7 +17,6 @@
   }
 
   *{ box-sizing: border-box; }
-
   html, body{ height: 100%; }
 
   body{
@@ -43,7 +32,6 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* ---------- Карточка ---------- */
   .checklist{
     max-width: 760px;
     margin: 0 auto;
@@ -53,7 +41,6 @@
     box-shadow: 0 24px 60px rgba(0, 0, 0, .38);
   }
 
-  /* ---------- Шапка ---------- */
   .checklist__header{
     background: var(--blue);
     color: var(--white);
@@ -72,7 +59,6 @@
     opacity: .92;
   }
 
-  /* ---------- Прогресс ---------- */
   .progress{ margin-top: 20px; }
   .progress__bar{
     height: 8px;
@@ -94,7 +80,6 @@
     letter-spacing: .01em;
   }
 
-  /* ---------- Поля с данными ---------- */
   .meta{
     display: flex;
     flex-wrap: wrap;
@@ -132,7 +117,6 @@
     box-shadow: 0 0 0 3px rgba(43, 149, 202, .18);
   }
 
-  /* ---------- Пункты ---------- */
   .items{
     list-style: none;
     margin: 0;
@@ -213,7 +197,6 @@
   }
   .item.is-done .item__title{ color: var(--blue-dark); }
 
-  /* ---------- Плашка «всё готово» ---------- */
   .result{
     display: none;
     align-items: center;
@@ -233,7 +216,6 @@
     to  { opacity: 1; transform: translateY(0); }
   }
 
-  /* ---------- Кнопки ---------- */
   .actions{
     display: flex;
     flex-wrap: wrap;
@@ -272,7 +254,6 @@
     color: var(--muted);
   }
 
-  /* ---------- Модальные окна ---------- */
   .modal{
     position: fixed;
     inset: 0;
@@ -315,7 +296,6 @@
   }
   .modal__actions .btn{ flex: 1 1 0; }
 
-  /* ---------- Адаптив ---------- */
   @media (max-width: 560px){
     body{ padding: 16px 10px; }
     .checklist__header{ padding: 22px 20px 20px; }
@@ -333,8 +313,8 @@
 <main class="checklist" role="main">
 
   <header class="checklist__header">
-    <h1 class="checklist__title">Чек-лист проверки курьера</h1>
-    <p class="checklist__subtitle">Отметьте каждый пункт после проверки — допуск к работе возможен только при полном выполнении.</p>
+    <h1 class="checklist__title">Чек-лист проверки перед выдачей байка</h1>
+    <p class="checklist__subtitle">Отметьте каждый пункт после проверки — выдача байка возможна только при полном выполнении.</p>
 
     <div class="progress">
       <div class="progress__bar">
@@ -427,7 +407,7 @@
 
   <div class="result" id="result" role="status" aria-live="polite">
     <span>✓</span>
-    <span>Все пункты проверены — курьера можно допускать к работе.</span>
+    <span>Все пункты проверены — можно переходить к выдаче байка.</span>
   </div>
 
   <div class="actions">
@@ -439,7 +419,6 @@
 
 </main>
 
-<!-- Модальное окно сброса -->
 <div class="modal" id="resetModal" role="dialog" aria-modal="true" aria-labelledby="resetModalText">
   <div class="modal__dialog">
     <p class="modal__text" id="resetModalText">Сбросить все отметки?</p>
@@ -450,7 +429,6 @@
   </div>
 </div>
 
-<!-- Модальное окно подтверждения скачивания -->
 <div class="modal" id="downloadModal" role="dialog" aria-modal="true" aria-labelledby="downloadModalText">
   <div class="modal__dialog">
     <p class="modal__text" id="downloadModalText">
@@ -468,7 +446,7 @@
 (function () {
   'use strict';
 
-  var STORAGE_KEY = 'courier-checklist-v1';
+  var STORAGE_KEY = 'courier-checklist-v2'; 
 
   var checkboxes   = Array.prototype.slice.call(
                        document.querySelectorAll('.item input[type="checkbox"]'));
@@ -480,7 +458,6 @@
   var resetBtn     = document.getElementById('resetBtn');
   var downloadBtn  = document.getElementById('downloadBtn');
 
-  // Модалки и их кнопки
   var resetModal   = document.getElementById('resetModal');
   var resetYes     = document.getElementById('resetYes');
   var resetNo      = document.getElementById('resetNo');
@@ -494,7 +471,6 @@
   var state = loadState();
   var lastFocused = null;
 
-  /* ---------- Хранилище ---------- */
   function loadState() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -507,22 +483,17 @@
   function saveState() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-      /* приватный режим / заблокированное хранилище — просто молчим */
-    }
+    } catch (e) {}
   }
 
-  /* ---------- Инициализация ---------- */
   function init() {
     state.items = state.items || {};
 
     checkboxes.forEach(function (cb) {
       var key = cb.dataset.key;
-
       if (state.items[key]) {
         cb.checked = true;
       }
-
       cb.addEventListener('change', function () {
         state.items[key] = cb.checked;
         saveState();
@@ -560,7 +531,6 @@
     return parts[2] + '.' + parts[1] + '.' + parts[0];
   }
 
-  /* ---------- Отрисовка состояния ---------- */
   function render() {
     var total = checkboxes.length;
     var done  = checkboxes.filter(function (cb) { return cb.checked; }).length;
@@ -576,7 +546,6 @@
     result.classList.toggle('is-visible', allDone);
   }
 
-  /* ---------- Вспомогательные ---------- */
   function escapeHtml(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
@@ -590,11 +559,10 @@
       .slice(0, 40) || 'без_имени';
   }
 
-  /* ---------- Управление модальными окнами ---------- */
   function openModal(modal) {
     lastFocused = document.activeElement;
     modal.classList.add('is-open');
-    var noBtn = modal.querySelector('.btn--ghost'); // безопасный фокус по умолчанию — «Нет»
+    var noBtn = modal.querySelector('.btn--ghost');
     if (noBtn) noBtn.focus();
   }
 
@@ -605,14 +573,12 @@
     }
   }
 
-  // Закрытие по клику на фон
   [resetModal, downloadModal].forEach(function(modal) {
     modal.addEventListener('click', function (e) {
       if (e.target === modal) closeModal(modal);
     });
   });
 
-  // Закрытие по Esc
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       var openModalElement = document.querySelector('.modal.is-open');
@@ -623,7 +589,6 @@
     }
   });
 
-  /* ---------- Кнопка сброса ---------- */
   resetBtn.addEventListener('click', function() {
     openModal(resetModal);
   });
@@ -640,7 +605,6 @@
     closeModal(resetModal);
   });
 
-  /* ---------- Кнопка скачивания ---------- */
   downloadBtn.addEventListener('click', function() {
     var total = checkboxes.length;
     var done = checkboxes.filter(function (cb) { return cb.checked; }).length;
@@ -663,7 +627,6 @@
     closeModal(downloadModal);
   });
 
-  /* ---------- Генерация .doc файла ---------- */
   function generateAndDownloadDoc() {
     var name = courierInput.value.trim();
     var date = dateInput.value || todayISO();
@@ -690,7 +653,7 @@
       );
     }).join('');
 
-    var verdict = allDone ? 'ДОПУСК РАЗРЕШЁН' : 'ТРЕБУЕТСЯ ДОРАБОТКА';
+    var verdict = allDone ? 'ГОТОВ К ВЫДАЧЕ БАЙКА' : 'ТРЕБУЕТСЯ ДОРАБОТКА';
     var verdictColor = allDone ? '#2B95CA' : '#B23A2E';
 
     var html =
@@ -699,11 +662,11 @@
             'xmlns="http://www.w3.org/TR/REC-html40">' +
       '<head>' +
         '<meta charset="utf-8">' +
-        '<title>Чек-лист проверки курьера</title>' +
+        '<title>Чек-лист проверки перед выдачей байка</title>' +
         '<style>@page{size:A4;margin:18mm;} body{font-family:Arial,Helvetica,sans-serif;color:#2D2D2C;font-size:14px;}</style>' +
       '</head>' +
       '<body>' +
-        '<h1 style="color:#2B95CA;margin:0 0 16px;font-size:22px;">Чек-лист проверки курьера</h1>' +
+        '<h1 style="color:#2B95CA;margin:0 0 16px;font-size:22px;">Чек-лист проверки перед выдачей байка</h1>' +
         '<table style="border-collapse:collapse;margin-bottom:16px;">' +
           '<tr><td style="padding:4px 12px 4px 0;color:#555;">ФИО курьера:</td>' +
               '<td style="padding:4px 0;"><b>' + escapeHtml(name || '—') + '</b></td></tr>' +
@@ -723,7 +686,7 @@
     var url  = URL.createObjectURL(blob);
     var a    = document.createElement('a');
     a.href = url;
-    a.download = 'чек-лист_' + safeFileName(name) + '_' + date + '.doc';
+    a.download = 'чек-лист_выдача_' + safeFileName(name) + '_' + date + '.doc';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
